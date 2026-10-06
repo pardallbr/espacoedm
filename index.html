@@ -55,7 +55,7 @@
     <!-- Botão de Login do Google -->
     <div class="auth-box" id="authSection">
         <p>Para puxar os dados direto da sua agenda, faça login com a sua conta Google:</p>
-        <button id="authorize_button" style="background-color: #27ae60; width: auto; padding: 10px 20px;">Conectar ao Google Agenda</button>
+        <button id="authorize_button" style="background-color: #27ae60; width: auto; padding: 10px 20px;">A carregar sistema do Google...</button>
     </div>
 
     <div class="config-section">
@@ -80,12 +80,11 @@
     <div id="resultado" style="margin-top: 30px;"></div>
 </div>
 
-<!-- Bibliotecas oficiais do Google para autenticação e API -->
+<!-- Bibliotecas oficiais do Google -->
 <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
 <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
 <script>
-    // Credenciais configuradas da sua conta
     const CLIENT_ID = '846101014697-c0jfi4ag8jnmusdr4q2vstl4hlh3pobd.apps.googleusercontent.com';
     const API_KEY = 'AIzaSyArLsqmBTkGynvYwAbb5diFFt7eSXDvGSs';
     const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
@@ -103,12 +102,16 @@
     }
 
     async function initializeGapiClient() {
-        await gapi.client.init({
-            apiKey: API_KEY,
-            discoveryDocs: [DISCOVERY_DOC],
-        });
-        gapiInited = true;
-        maybeEnableButton();
+        try {
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: [DISCOVERY_DOC],
+            });
+            gapiInited = true;
+            verificarPronto();
+        } catch (err) {
+            console.error("Erro ao iniciar GAPI:", err);
+        }
     }
 
     function gisLoaded() {
@@ -118,11 +121,13 @@
             callback: '', 
         });
         gisInited = true;
-        maybeEnableButton();
+        verificarPronto();
     }
 
-    function maybeEnableButton() {
+    function verificarPronto() {
         if (gapiInited && gisInited) {
+            authorizeButton.innerText = "Conectar ao Google Agenda";
+            authorizeButton.style.backgroundColor = "#27ae60";
             authorizeButton.onclick = handleAuthClick;
         }
     }
@@ -130,7 +135,8 @@
     function handleAuthClick() {
         tokenClient.callback = async (resp) => {
             if (resp.error !== undefined) {
-                throw (resp);
+                alert("Erro na autenticação: " + JSON.stringify(resp));
+                return;
             }
             authorizeButton.innerText = "Conectado com Sucesso!";
             authorizeButton.style.backgroundColor = "#7f8c8d";
@@ -145,7 +151,6 @@
         }
     }
 
-    // Adicionar mais campos de pacientes dinamicamente
     document.getElementById('btnAddPaciente').addEventListener('click', function() {
         const container = document.getElementById('tabelaPrecos');
         const novaLinha = document.createElement('div');
@@ -157,7 +162,6 @@
         container.appendChild(novaLinha);
     });
 
-    // Botão para puxar dados da agenda e gerar relatório
     btnGerar.addEventListener('click', async function() {
         const mesSelecionado = document.getElementById('mesAno').value;
         if (!mesSelecionado) {
