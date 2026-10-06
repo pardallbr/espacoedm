@@ -34,6 +34,7 @@ td input[type=number]{width:120px}
 <div id="agendas"></div>
 <h3>2. Mês de referência</h3>
 <input type="month" id="mes">
+<br><label class="chk" style="margin-top:12px">Contar sessões até o dia: <input type="date" id="ate"></label>
 <br><button id="btnBuscar">Buscar crianças da agenda</button>
 <div id="lista"></div>
 <div id="resultado"></div>
@@ -51,6 +52,8 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let tokenClient,gapiOk=false,gisOk=false,dados=[];
 
+function dataLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function ajustaAte(){const mes=$('mes').value;if(!mes)return;const p=mes.split('-').map(Number),h=new Date(),atual=h.getFullYear()===p[0]&&h.getMonth()+1===p[1];$('ate').value=dataLocal(atual?h:new Date(p[0],p[1],0))}
 function erro(m){$('msg').innerHTML='<div class="erro-box">'+m+'</div>'}
 function falha(e){
   const st=e&&(e.status||(e.result&&e.result.error&&e.result.error.code));
@@ -85,7 +88,7 @@ function onToken(r){
 async function conectado(){
   $('btnAuth').textContent='Conectado ✓';$('btnAuth').disabled=true;$('msg').innerHTML='';
   $('app').style.display='block';
-  $('mes').value=new Date().toISOString().slice(0,7);
+  $('mes').value=dataLocal(new Date()).slice(0,7);$('mes').onchange=ajustaAte;ajustaAte();
   try{
     const r=await gapi.client.calendar.calendarList.list();
     const sel=LS.get('edm_ags',null);
@@ -102,7 +105,7 @@ $('btnBuscar').onclick=async()=>{
   if(!ags.length){alert('Marque pelo menos uma agenda.');return}
   LS.set('edm_ags',ags);
   $('lista').innerHTML='<p>Buscando na agenda...</p>';$('resultado').innerHTML='';$('msg').innerHTML='';
-  const [a,m]=mes.split('-'),ini=new Date(a,m-1,1).toISOString(),fim=new Date(a,m,1).toISOString(),mapa={};
+  const [a,m]=mes.split('-'),ini=new Date(a,m-1,1).toISOString(),[ay,am,ad]=($('ate').value||mes+'-01').split('-').map(Number),fim=new Date(ay,am-1,ad+1).toISOString(),mapa={};
   try{
     for(const id of ags){
       let pt;
@@ -139,7 +142,7 @@ function calcular(){
   });
   LS.set('edm_vals',vals);LS.set('edm_off',off);
   const f=n=>'R$ '+n.toFixed(2).replace('.',','),c=n=>n.toFixed(2).replace('.',',');
-  $('resultado').innerHTML='<h3>Relatório de '+$('mes').value+'</h3>'+
+  $('resultado').innerHTML='<h3>Relatório de '+$('mes').value+' (sessões até '+($('ate').value||'').split('-').reverse().join('/')+')</h3>'+
     '<table><thead><tr><th>Criança</th><th>Sessões</th><th>Valor da sessão</th><th>Total</th></tr></thead><tbody>'+
     linhas.map(l=>'<tr><td>'+esc(l[0])+'</td><td>'+l[1]+'</td><td>'+f(l[2])+'</td><td>'+f(l[3])+'</td></tr>').join('')+
     '</tbody></table><div class="total-box">Valor Total do Mês: '+f(tot)+'</div><button id="btnCsv">Baixar planilha (CSV)</button>';
