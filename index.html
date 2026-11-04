@@ -6,7 +6,7 @@
 <title>Relatório de Aulas - Espaço EDM</title>
 <style>
 body{font-family:Arial,sans-serif;background:#f4f7f6;color:#333;margin:0;padding:20px}
-.container{max-width:1000px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1)}
+.container{max-width:1100px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1)}
 h1{color:#2c3e50;font-size:24px}h3{margin-top:25px;color:#2c3e50}
 input,button{padding:10px;border:1px solid #ccc;border-radius:4px;font-size:16px;box-sizing:border-box}
 button{background:#3498db;color:#fff;border:none;cursor:pointer;font-weight:bold;margin-top:10px;padding:10px 20px}
@@ -120,27 +120,26 @@ $('btnBuscar').onclick=async()=>{
         (r.result.items||[]).forEach(ev=>{
           if(ev.status==='cancelled'||!ev.summary||!/[\p{L}\p{N}]/u.test(ev.summary))return;
           const nome=ev.summary.trim(),k=nome.toLowerCase();
-          (mapa[k]=mapa[k]||{nome:nome,n:0}).n++;
+          (mapa[k]=mapa[k]||{nome:nome,n:0,dias:[]}).n++;
+          const diaStr=new Date(ev.start.dateTime||ev.start.date).getDate().toString().padStart(2,'0');
+          if(!mapa[k].dias.includes(diaStr)) mapa[k].dias.push(diaStr);
         });
         pt=r.result.nextPageToken;
       }while(pt);
     }
   }catch(e){falha(e);$('lista').innerHTML='';return}
-  dados=Object.keys(mapa).map(k=>({k:k,nome:mapa[k].nome,n:mapa[k].n})).sort((x,y)=>x.nome.localeCompare(y.nome));
+  dados=Object.keys(mapa).map(k=>({k:k,nome:mapa[k].nome,n:mapa[k].n,dias:mapa[k].dias.sort()})).sort((x,y)=>x.nome.localeCompare(y.nome));
   if(!dados.length){$('lista').innerHTML='<div class="erro-box">Nenhum evento encontrado nesse mês.</div>';return}
   
   const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{});
-  const cobrados=LS.get('edm_cobrados_'+mes,{});
 
   let htmlTable='<h3>2. Desmarque o que não é criança e coloque o valor da sessão</h3>'+
-    '<table><thead><tr><th style="width:70px" class="text-center">Cobrado</th><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>';
+    '<table><thead><tr><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>';
   
   dados.forEach((d,i)=>{
-    const cobChecked=cobrados[d.k]?'checked':'';
     const incChecked=off[d.k]?'':'checked';
     const valStr=vals[d.k]!==undefined?vals[d.k]:'';
     htmlTable+='<tr>'+
-      '<td class="text-center"><input type="checkbox" class="cob" data-i="'+i+'" '+cobChecked+'></td>'+
       '<td><input type="checkbox" class="inc" data-i="'+i+'" '+incChecked+'></td>'+
       '<td>'+esc(d.nome)+'</td><td>'+d.n+'</td>'+
       '<td><input type="number" step="0.01" min="0" class="val" data-i="'+i+'" value="'+valStr+'"></td>'+
@@ -149,12 +148,47 @@ $('btnBuscar').onclick=async()=>{
 
   htmlTable+='</tbody></table><button id="btnCalc">Calcular total do mês</button>';
   $('lista').innerHTML=htmlTable;
+  $('btnCalc').onclick=calcular;
+};
+
+function calcular(){
+  const mes=$('mes').value;
+  const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{}),linhas=[];let tot=0;
+  const cobrados=LS.get('edm_cobrados_'+mes,{});
+
+  dados.forEach((d,i)=>{
+    const inc=document.querySelector('.inc[data-i="'+i+'"]').checked;
+    const v=parseFloat(document.querySelector('.val[data-i="'+i+'"]').value)||0;
+    off[d.k]=!inc;if(v)vals[d.k]=v;else delete vals[d.k];
+    if(inc){
+      const t=d.n*v;
+      tot+=t;
+      linhas.push({k:d.k,nome:d.nome,n:d.n,v:v,t:t});
+    }
+  });
+  LS.set('edm_vals',vals);LS.set('edm_off',off);
+
+  const f=n=>'R$ '+n.toFixed(2).replace('.',','),c=n=>n.toFixed(2).replace('.',',');
   
-  // Atribuir o evento de clique nas caixas de "Cobrado" de forma segura
-  document.querySelectorAll('.cob').forEach(chk=>{
+  // Monta a tabela do relatório final com a coluna "Cobrado" à esquerda
+  let htmlRes='<h3>Relatório de Sessões (até '+($('ate').value||'').split('-').reverse().join('/')+')</h3>'+
+    '<table><thead><tr><th style="width:80px" class="text-center">Cobrado</th><th>Criança</th><th>Sessões</th><th>Valor da sessão</th><th>Total</th></tr></thead><tbody>';
+
+  linhas.forEach(l=>{
+    const cobChecked=cobrados[l.k]?'checked':'';
+    htmlRes+='<tr>'+
+      '<td class="text-center"><input type="checkbox" class="cob-res" data-k="'+l.k+'" '+cobChecked+'></td>'+
+      '<td>'+esc(l.nome)+'</td><td>'+l.n+'</td><td>'+f(l.v)+'</td><td>'+f(l.t)+'</td>'+
+    '</tr>';
+  });
+
+  htmlRes+='</tbody></table><div class="total-box">Valor Total do Mês: '+f(tot)+'</div><button id="btnCsv">Baixar Planilha (Excel)</button>';
+  $('resultado').innerHTML=htmlRes;
+
+  // Ativa o salvamento das caixas de seleção de cobrado no relatório final
+  document.querySelectorAll('.cob-res').forEach(chk=>{
     chk.addEventListener('change', function(){
-      const idx=this.getAttribute('data-i');
-      const k=dados[idx].k;
+      const k=this.getAttribute('data-k');
       const cobMap=LS.get('edm_cobrados_'+mes,{});
       if(this.checked){
         cobMap[k]=true;
@@ -165,30 +199,16 @@ $('btnBuscar').onclick=async()=>{
     });
   });
 
-  $('btnCalc').onclick=calcular;
-};
-
-function calcular(){
-  const mes=$('mes').value;
-  const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{}),linhas=[];let tot=0;
-  dados.forEach((d,i)=>{
-    const inc=document.querySelector('.inc[data-i="'+i+'"]').checked;
-    const v=parseFloat(document.querySelector('.val[data-i="'+i+'"]').value)||0;
-    off[d.k]=!inc;if(v)vals[d.k]=v;else delete vals[d.k];
-    if(inc){const t=d.n*v;tot+=t;linhas.push([d.nome,d.n,v,t])}
-  });
-  LS.set('edm_vals',vals);LS.set('edm_off',off);
-  const f=n=>'R$ '+n.toFixed(2).replace('.',','),c=n=>n.toFixed(2).replace('.',',');
-  $('resultado').innerHTML='<h3>Relatório de '+mes+' (sessões até '+($('ate').value||'').split('-').reverse().join('/')+')</h3>'+
-    '<table><thead><tr><th>Criança</th><th>Sessões</th><th>Valor da sessão</th><th>Total</th></tr></thead><tbody>'+
-    linhas.map(l=>'<tr><td>'+esc(l[0])+'</td><td>'+l[1]+'</td><td>'+f(l[2])+'</td><td>'+f(l[3])+'</td></tr>').join('')+
-    '</tbody></table><div class="total-box">Valor Total do Mês: '+f(tot)+'</div><button id="btnCsv">Baixar planilha (CSV)</button>';
   $('btnCsv').onclick=()=>{
-    const rows=['Criança;Sessões;Valor da sessão;Total'].concat(linhas.map(l=>'"'+l[0].replace(/"/g,'""')+'";'+l[1]+';'+c(l[2])+';'+c(l[3]))).concat(['"TOTAL";;;'+c(tot)]);
+    const rows=['Cobrado;Criança;Sessões;Valor da sessão;Total'].concat(linhas.map(l=>{
+      const cob=cobrados[l.k]?'SIM':'NÃO';
+      return '"'+cob+'";"'+l.nome.replace(/"/g,'""')+'";'+l.n+';'+c(l.v)+';'+c(l.t);
+    })).concat(['";"TOTAL";;;'+c(tot)]);
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     a.download='relatorio-'+mes+'.csv';a.click();
   };
+
   $('resultado').scrollIntoView({behavior:'smooth'});
 }
 </script>
