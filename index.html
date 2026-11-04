@@ -66,7 +66,7 @@ function gapiLoaded(){gapi.load('client',async()=>{
   catch(e){erro('Erro ao iniciar a API do Google. Confira a API Key e se a Google Calendar API está ativada.')}
 })}
 function gisLoaded(){
-  try{tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:onToken,
+  try{tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:onToken,
     error_callback:e=>erro('Erro no login ('+(e.type||'desconhecido')+'). Confira a origem autorizada no Google Cloud.')});
     gisOk=true;pronto()}
   catch(e){erro('Erro ao iniciar o login do Google. Confira o CLIENT_ID.')}
@@ -130,7 +130,7 @@ $('btnBuscar').onclick=async()=>{
   if(!dados.length){$('lista').innerHTML='<div class="erro-box">Nenhum evento encontrado nesse mês.</div>';return}
   
   const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{});
-  const cobrados=LS.get('edm_cobrados_'+mes,{}); // Carrega os dados estritamente do mês selecionado
+  const cobrados=LS.get('edm_cobrados_'+mes,{});
 
   $('lista').innerHTML='<h3>2. Desmarque o que não é criança e coloque o valor da sessão</h3>'+
     '<table><thead><tr><th style="width:70px" class="text-center">Cobrado</th><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>'+
@@ -145,7 +145,6 @@ $('btnBuscar').onclick=async()=>{
     }).join('')+
     '</tbody></table><button id="btnCalc">Calcular total do mês</button>';
   
-  // Atualiza o salvamento do "Cobrado" vinculado ao mês ativo
   document.querySelectorAll('.cob').forEach(chk=>{
     chk.onchange=()=>{
       const idx=chk.getAttribute('data-i');
