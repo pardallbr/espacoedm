@@ -132,27 +132,37 @@ $('btnBuscar').onclick=async()=>{
   const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{});
   const cobrados=LS.get('edm_cobrados_'+mes,{});
 
-  $('lista').innerHTML='<h3>2. Desmarque o que não é criança e coloque o valor da sessão</h3>'+
-    '<table><thead><tr><th style="width:70px" class="text-center">Cobrado</th><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>'+
-    dados.map((d,i)=>{
-      const cobChecked=cobrados[d.k]?'checked':'';
-      return '<tr>'+
-        '<td class="text-center"><input type="checkbox" class="cob" data-i="'+i+'" '+cobChecked+' title="Marcar como cobrado"></td>'+
-        '<td><input type="checkbox" class="inc" data-i="'+i+'" '+(off[d.k]?'':'checked')+'></td>'+
-        '<td>'+esc(d.nome)+'</td><td>'+d.n+'</td>'+
-        '<td><input type="number" step="0.01" min="0" class="val" data-i="'+i+'" value="'+(vals[d.k]!==undefined?vals[d.k]:'')+'"></td>'+
-      '</tr>';
-    }).join('')+
-    '</tbody></table><button id="btnCalc">Calcular total do mês</button>';
+  let htmlTable='<h3>2. Desmarque o que não é criança e coloque o valor da sessão</h3>'+
+    '<table><thead><tr><th style="width:70px" class="text-center">Cobrado</th><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>';
   
+  dados.forEach((d,i)=>{
+    const cobChecked=cobrados[d.k]?'checked':'';
+    const incChecked=off[d.k]?'':'checked';
+    const valStr=vals[d.k]!==undefined?vals[d.k]:'';
+    htmlTable+='<tr>'+
+      '<td class="text-center"><input type="checkbox" class="cob" data-i="'+i+'" '+cobChecked+'></td>'+
+      '<td><input type="checkbox" class="inc" data-i="'+i+'" '+incChecked+'></td>'+
+      '<td>'+esc(d.nome)+'</td><td>'+d.n+'</td>'+
+      '<td><input type="number" step="0.01" min="0" class="val" data-i="'+i+'" value="'+valStr+'"></td>'+
+    '</tr>';
+  });
+
+  htmlTable+='</tbody></table><button id="btnCalc">Calcular total do mês</button>';
+  $('lista').innerHTML=htmlTable;
+  
+  // Atribuir o evento de clique nas caixas de "Cobrado" de forma segura
   document.querySelectorAll('.cob').forEach(chk=>{
-    chk.onchange=()=>{
-      const idx=chk.getAttribute('data-i');
+    chk.addEventListener('change', function(){
+      const idx=this.getAttribute('data-i');
       const k=dados[idx].k;
       const cobMap=LS.get('edm_cobrados_'+mes,{});
-      if(chk.checked) cobMap[k]=true; else delete cobMap[k];
+      if(this.checked){
+        cobMap[k]=true;
+      }else{
+        delete cobMap[k];
+      }
       LS.set('edm_cobrados_'+mes,cobMap);
-    };
+    });
   });
 
   $('btnCalc').onclick=calcular;
