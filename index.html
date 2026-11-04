@@ -6,7 +6,7 @@
 <title>Relatório de Aulas - Espaço EDM</title>
 <style>
 body{font-family:Arial,sans-serif;background:#f4f7f6;color:#333;margin:0;padding:20px}
-.container{max-width:900px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1)}
+.container{max-width:1000px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1)}
 h1{color:#2c3e50;font-size:24px}h3{margin-top:25px;color:#2c3e50}
 input,button{padding:10px;border:1px solid #ccc;border-radius:4px;font-size:16px;box-sizing:border-box}
 button{background:#3498db;color:#fff;border:none;cursor:pointer;font-weight:bold;margin-top:10px;padding:10px 20px}
@@ -20,6 +20,7 @@ td input[type=number]{width:120px}
 .auth-box{background:#e8f8f5;padding:15px;border-radius:6px;margin-bottom:20px;border:1px solid #a3e4d7;text-align:center}
 .erro-box{background:#fdecea;border:1px solid #f5c6cb;color:#611a15;padding:12px;border-radius:6px;margin-top:15px;font-size:14px}
 .chk{display:block;margin:6px 0}
+.text-center{text-align:center}
 </style>
 </head>
 <body>
@@ -65,7 +66,7 @@ function gapiLoaded(){gapi.load('client',async()=>{
   catch(e){erro('Erro ao iniciar a API do Google. Confira a API Key e se a Google Calendar API está ativada.')}
 })}
 function gisLoaded(){
-  try{tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:onToken,
+  try{tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:onToken,
     error_callback:e=>erro('Erro no login ('+(e.type||'desconhecido')+'). Confira a origem autorizada no Google Cloud.')});
     gisOk=true;pronto()}
   catch(e){erro('Erro ao iniciar o login do Google. Confira o CLIENT_ID.')}
@@ -127,15 +128,39 @@ $('btnBuscar').onclick=async()=>{
   }catch(e){falha(e);$('lista').innerHTML='';return}
   dados=Object.keys(mapa).map(k=>({k:k,nome:mapa[k].nome,n:mapa[k].n})).sort((x,y)=>x.nome.localeCompare(y.nome));
   if(!dados.length){$('lista').innerHTML='<div class="erro-box">Nenhum evento encontrado nesse mês.</div>';return}
+  
   const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{});
+  const cobrados=LS.get('edm_cobrados_'+mes,{}); // Carrega os dados estritamente do mês selecionado
+
   $('lista').innerHTML='<h3>2. Desmarque o que não é criança e coloque o valor da sessão</h3>'+
-    '<table><thead><tr><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>'+
-    dados.map((d,i)=>'<tr><td><input type="checkbox" class="inc" data-i="'+i+'" '+(off[d.k]?'':'checked')+'></td><td>'+esc(d.nome)+'</td><td>'+d.n+'</td><td><input type="number" step="0.01" min="0" class="val" data-i="'+i+'" value="'+(vals[d.k]!==undefined?vals[d.k]:'')+'"></td></tr>').join('')+
+    '<table><thead><tr><th style="width:70px" class="text-center">Cobrado</th><th>Incluir</th><th>Nome no evento</th><th>Sessões</th><th>Valor (R$)</th></tr></thead><tbody>'+
+    dados.map((d,i)=>{
+      const cobChecked=cobrados[d.k]?'checked':'';
+      return '<tr>'+
+        '<td class="text-center"><input type="checkbox" class="cob" data-i="'+i+'" '+cobChecked+' title="Marcar como cobrado"></td>'+
+        '<td><input type="checkbox" class="inc" data-i="'+i+'" '+(off[d.k]?'':'checked')+'></td>'+
+        '<td>'+esc(d.nome)+'</td><td>'+d.n+'</td>'+
+        '<td><input type="number" step="0.01" min="0" class="val" data-i="'+i+'" value="'+(vals[d.k]!==undefined?vals[d.k]:'')+'"></td>'+
+      '</tr>';
+    }).join('')+
     '</tbody></table><button id="btnCalc">Calcular total do mês</button>';
+  
+  // Atualiza o salvamento do "Cobrado" vinculado ao mês ativo
+  document.querySelectorAll('.cob').forEach(chk=>{
+    chk.onchange=()=>{
+      const idx=chk.getAttribute('data-i');
+      const k=dados[idx].k;
+      const cobMap=LS.get('edm_cobrados_'+mes,{});
+      if(chk.checked) cobMap[k]=true; else delete cobMap[k];
+      LS.set('edm_cobrados_'+mes,cobMap);
+    };
+  });
+
   $('btnCalc').onclick=calcular;
 };
 
 function calcular(){
+  const mes=$('mes').value;
   const vals=LS.get('edm_vals',{}),off=LS.get('edm_off',{}),linhas=[];let tot=0;
   dados.forEach((d,i)=>{
     const inc=document.querySelector('.inc[data-i="'+i+'"]').checked;
@@ -145,7 +170,7 @@ function calcular(){
   });
   LS.set('edm_vals',vals);LS.set('edm_off',off);
   const f=n=>'R$ '+n.toFixed(2).replace('.',','),c=n=>n.toFixed(2).replace('.',',');
-  $('resultado').innerHTML='<h3>Relatório de '+$('mes').value+' (sessões até '+($('ate').value||'').split('-').reverse().join('/')+')</h3>'+
+  $('resultado').innerHTML='<h3>Relatório de '+mes+' (sessões até '+($('ate').value||'').split('-').reverse().join('/')+')</h3>'+
     '<table><thead><tr><th>Criança</th><th>Sessões</th><th>Valor da sessão</th><th>Total</th></tr></thead><tbody>'+
     linhas.map(l=>'<tr><td>'+esc(l[0])+'</td><td>'+l[1]+'</td><td>'+f(l[2])+'</td><td>'+f(l[3])+'</td></tr>').join('')+
     '</tbody></table><div class="total-box">Valor Total do Mês: '+f(tot)+'</div><button id="btnCsv">Baixar planilha (CSV)</button>';
@@ -153,7 +178,7 @@ function calcular(){
     const rows=['Criança;Sessões;Valor da sessão;Total'].concat(linhas.map(l=>'"'+l[0].replace(/"/g,'""')+'";'+l[1]+';'+c(l[2])+';'+c(l[3]))).concat(['"TOTAL";;;'+c(tot)]);
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
-    a.download='relatorio-'+$('mes').value+'.csv';a.click();
+    a.download='relatorio-'+mes+'.csv';a.click();
   };
   $('resultado').scrollIntoView({behavior:'smooth'});
 }
