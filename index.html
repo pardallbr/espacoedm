@@ -170,7 +170,6 @@ function calcular(){
 
   const f=n=>'R$ '+n.toFixed(2).replace('.',','),c=n=>n.toFixed(2).replace('.',',');
   
-  // Monta a tabela do relatório final com a coluna "Cobrado" à esquerda
   let htmlRes='<h3>Relatório de Sessões (até '+($('ate').value||'').split('-').reverse().join('/')+')</h3>'+
     '<table><thead><tr><th style="width:80px" class="text-center">Cobrado</th><th>Criança</th><th>Sessões</th><th>Valor da sessão</th><th>Total</th></tr></thead><tbody>';
 
@@ -185,7 +184,6 @@ function calcular(){
   htmlRes+='</tbody></table><div class="total-box">Valor Total do Mês: '+f(tot)+'</div><button id="btnCsv">Baixar Planilha (Excel)</button>';
   $('resultado').innerHTML=htmlRes;
 
-  // Ativa o salvamento das caixas de seleção de cobrado no relatório final
   document.querySelectorAll('.cob-res').forEach(chk=>{
     chk.addEventListener('change', function(){
       const k=this.getAttribute('data-k');
